@@ -1,0 +1,27 @@
+# Q8 Relay beside an existing arr stack. Put this service in the same
+# compose file as Radarr and Sonarr (or join their network), and give it
+# the same /data volume they use, at the same path — Relay reads the
+# imported files where the arrs put them.
+services:
+  q8-relay:
+    image: ghcr.io/q8-app/q8-relay:0.1
+    container_name: q8-relay
+    # The same user as your arrs (their PUID:PGID), so Relay can read
+    # their files and write its own /config.
+    user: "1000:1000"
+    environment:
+      RADARR_URL: http://radarr:7878
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      SONARR_URL: http://sonarr:8989
+      SONARR_API_KEY: ${SONARR_API_KEY}
+      # LIDARR_URL: http://lidarr:8686
+      # LIDARR_API_KEY: ${LIDARR_API_KEY}
+    volumes:
+      - ./q8-relay:/config
+      - /path/to/data:/data:ro
+    ports:
+      - "8484:8484"
+    restart: unless-stopped
+    # For Q8 to find Relay by itself over Bonjour, use the host's network
+    # instead of ports: (Linux only). Without it, type the address in Q8.
+    # network_mode: host
