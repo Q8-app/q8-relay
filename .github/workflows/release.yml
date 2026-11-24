@@ -36,7 +36,7 @@ jobs:
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Q8 Relay
-            org.opencontainers.image.description=Tells Q8 the moment Radarr, Sonarr or Lidarr imports a file, and serves it over HTTP.
+            org.opencontainers.image.description=Tells Q8 within seconds when Radarr, Sonarr or Lidarr imports a file, and serves it over HTTP.
             org.opencontainers.image.licenses=MIT
       - uses: docker/build-push-action@v6
         with:

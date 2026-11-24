@@ -1,5 +1,5 @@
 // Command q8-relay runs Relay: it watches Radarr, Sonarr and Lidarr, and
-// tells a paired Q8 the moment a file is imported, serving the file itself
+// tells a paired Q8 within seconds of a file being imported, serving the file itself
 // over HTTP. In "Connect what you have" it only reads: nothing on the
 // stack changes.
 package main

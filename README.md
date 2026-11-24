@@ -3,9 +3,12 @@
 Relay connects your Radarr, Sonarr and Lidarr to [Q8](https://q-8.app), a Mac
 app that names, tags and converts your films, TV, music, audiobooks and books.
 
-When an arr imports a file, Relay tells Q8 straight away. Q8 downloads the
-file from Relay, converts it, and puts it into the TV app or your library
-folder. No network share needed, and no polling every five minutes.
+Relay checks your arrs every 10 seconds. Once an imported file is complete,
+it tells Q8 at once, over a connection Q8 keeps open, usually within 20
+seconds of the import. Q8 downloads the file from Relay, converts it, and
+puts it into the TV app or your library folder. No network share needed.
+Without Relay, Q8 asks your arrs itself every five minutes and reads the
+files over a share.
 
 - Runs beside your arrs as one small container (amd64 and arm64)
 - Read-only by default: it changes nothing in your arrs
@@ -63,10 +66,11 @@ type `server:8484` in Q8.
 
 Relay starts in **Connect what you have** mode:
 
-- It reads your arrs' import history every few seconds, with GET requests
-  only.
-- It waits until each imported file is complete, then announces it to the
-  Q8s paired with it.
+- It reads your arrs' import history every 10 seconds
+  (`RELAY_POLL_INTERVAL`), with GET requests only. It adds no webhook, so
+  nothing in your arrs needs to reach it.
+- It waits until each imported file is complete (the arr's size, on two
+  checks running), then announces it to the Q8s paired with it at once.
 - It serves that file, and only that file, over HTTP. Interrupted downloads
   resume.
 - It leaves your arrs' settings and files exactly as they are.
@@ -91,6 +95,14 @@ couldn't check stays in its arr.
 - The only setting Relay adds is a tag, `q8-relay-<id>`, marking the arr as
   this Relay's. One arr, one Relay: a second Relay is refused.
 - **Undo Q8 Focused** in Q8 removes the tag, and nothing more is deleted.
+
+**Firewall:** with `network_mode: host`, Relay sits behind the host's
+firewall, unlike containers with published ports (Docker bypasses UFW for
+those). Allow port 8484 from the network your Macs are on, for example
+`sudo ufw allow from 192.168.1.0/24 to any port 8484 proto tcp`. Bonjour
+needs no rule: Ubuntu's UFW accepts mDNS by default. If the Macs are on
+another network or VLAN than the server, Bonjour only crosses with your
+router's mDNS reflector on; otherwise type the address in Q8.
 
 ## Settings
 
