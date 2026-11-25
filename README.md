@@ -179,18 +179,6 @@ import is a full copy. The [Servarr Wiki](https://wiki.servarr.com) and the
 Starting from scratch? Use each app's official image, set it up as the
 Servarr Wiki describes, and add Relay as above.
 
-### Ways to request
-
-1. **Bare minimum.** Ask for a film on Radarr's own page.
-2. **Comfortable, no extras.** Add Radarr's import lists: an IMDb or Trakt
-   watchlist you add to from your phone.
-3. **Most comfortable.** Add Seerr and Jellyfin or Plex. Seerr signs in
-   through them. *Coming soon:* Relay marking a request Available in Seerr
-   once Q8 has it.
-
-Tip: Radarr's **Settings › Connect › On Grab** can tell your phone when a
-film you asked for long ago starts downloading.
-
 ## Your responsibility
 
 Relay works with the apps you run, on your network. You're responsible for
