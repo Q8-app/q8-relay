@@ -62,6 +62,37 @@ RELAY_PATH_MAP=/data=/mnt/storage,/downloads=/mnt/downloads
 Bonjour needs `network_mode: host` (Linux) instead of `ports:`. Without it,
 type `server:8484` in Q8.
 
+On the host's network Relay can't reach your arrs by their container names,
+so point it at the ports they publish on the host:
+
+```yaml
+  q8-relay:
+    image: ghcr.io/q8-app/q8-relay:0.1
+    container_name: q8-relay
+    user: "1000:1000"            # your arrs' PUID:PGID
+    network_mode: host           # replaces ports:
+    environment:
+      RADARR_URL: http://localhost:7878
+      RADARR_API_KEY: ${RADARR_API_KEY}
+      SONARR_URL: http://localhost:8989
+      SONARR_API_KEY: ${SONARR_API_KEY}
+    volumes:
+      - ./q8-relay:/config
+      - /path/to/data:/data:ro
+    restart: unless-stopped
+```
+
+Relay then listens on the host's port 8484 directly. To use another one, set
+`RELAY_PORT`.
+
+**Firewall:** with `network_mode: host`, Relay sits behind the host's
+firewall, unlike containers with published ports (Docker bypasses UFW for
+those). Allow port 8484 from the network your Macs are on, for example
+`sudo ufw allow from 192.168.1.0/24 to any port 8484 proto tcp`. Bonjour
+needs no rule: Ubuntu's UFW accepts mDNS by default. If the Macs are on
+another network or VLAN than the server, Bonjour only crosses with your
+router's mDNS reflector on; otherwise type the address in Q8.
+
 ## How it works
 
 Relay starts in **Connect what you have** mode:
@@ -95,14 +126,6 @@ couldn't check stays in its arr.
 - The only setting Relay adds is a tag, `q8-relay-<id>`, marking the arr as
   this Relay's. One arr, one Relay: a second Relay is refused.
 - **Undo Q8 Focused** in Q8 removes the tag, and nothing more is deleted.
-
-**Firewall:** with `network_mode: host`, Relay sits behind the host's
-firewall, unlike containers with published ports (Docker bypasses UFW for
-those). Allow port 8484 from the network your Macs are on, for example
-`sudo ufw allow from 192.168.1.0/24 to any port 8484 proto tcp`. Bonjour
-needs no rule: Ubuntu's UFW accepts mDNS by default. If the Macs are on
-another network or VLAN than the server, Bonjour only crosses with your
-router's mDNS reflector on; otherwise type the address in Q8.
 
 ## Settings
 
@@ -143,7 +166,8 @@ Type `server:8484` in Q8, or use `network_mode: host`.
 so Relay can read their files and write `/config`.
 
 **An arr won't connect.** Check its URL from inside Relay's network
-(`http://radarr:7878`, not `localhost`) and its API key (Settings › General).
+(`http://radarr:7878`, not `localhost`; with `network_mode: host` it's the
+other way round) and its API key (Settings › General).
 
 ## What you need
 
