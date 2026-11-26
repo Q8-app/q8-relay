@@ -3,10 +3,10 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -40,6 +40,20 @@ type Server struct {
 	Watchers []*arr.Watcher
 	Focused  *focused.Focused
 	Log      *slog.Logger
+	// For the page: each arr's health, what's been served, when Relay
+	// started, and why Bonjour isn't announcing it ("" while it is).
+	Health  *arr.Board
+	Stats   *Stats
+	Started time.Time
+	Bonjour string
+}
+
+type clientKey struct{}
+
+// client is the paired Q8 a request came from.
+func client(r *http.Request) pairing.Client {
+	c, _ := r.Context().Value(clientKey{}).(pairing.Client)
+	return c
 }
 
 // Handler routes Relay's requests.
@@ -72,11 +86,12 @@ func (s *Server) paired(next http.HandlerFunc) http.Handler {
 			writeError(w, http.StatusUnauthorized, "pair with this Relay first")
 			return
 		}
-		if _, ok := s.Pairing.Check(strings.TrimSpace(key)); !ok {
+		c, ok := s.Pairing.Check(strings.TrimSpace(key))
+		if !ok {
 			writeError(w, http.StatusUnauthorized, "this key isn't paired with this Relay any more: pair again")
 			return
 		}
-		next(w, r)
+		next(w, r.WithContext(context.WithValue(r.Context(), clientKey{}, c)))
 	})
 }
 
@@ -150,6 +165,9 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Accel-Buffering", "no")
 	missed, ch, stop := s.Hub.Listen(after(r))
 	defer stop()
+	if s.Stats != nil {
+		defer s.Stats.Listening(client(r).ID)()
+	}
 	fmt.Fprintf(w, "retry: 5000\n\n")
 	for _, a := range missed {
 		writeEvent(w, a)
@@ -208,55 +226,17 @@ func (s *Server) file(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filepath.Base(a.Path)}))
-	http.ServeContent(w, r, filepath.Base(a.Path), info.ModTime(), f)
-}
-
-var pageTemplate = template.Must(template.New("page").Parse(`<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>{{.Name}}</title>
-<style>
-body{font:15px/1.5 -apple-system,system-ui,sans-serif;max-width:34em;margin:3em auto;padding:0 1em;color:#222;background:#fafafa}
-h1{font-size:1.4em;margin:0 0 .2em}.dim{color:#777}.code{font:600 2.2em ui-monospace,monospace;letter-spacing:.06em;margin:.2em 0}
-table{border-collapse:collapse;width:100%}td{padding:.3em 0;border-bottom:1px solid #eee}.bad{color:#b4462c}
-@media (prefers-color-scheme:dark){body{background:#1c1c1e;color:#eee}td{border-color:#333}}
-</style></head><body>
-<h1>{{.Name}}</h1>
-<p class="dim">Version {{.Version}} · protocol {{.Protocol}} · ID {{.ID}}</p>
-{{if .ShowCode}}<p>To connect Q8, type this code in Connect to Relay…:</p>
-<p class="code">{{.Code}}</p><p class="dim">It changes once used, and every 15 minutes.</p>
-{{else}}<p>The pairing code is in Relay's log.</p>{{end}}
-<h2>Apps</h2><table>{{range .Apps}}<tr><td>{{.Name}}</td><td>{{if .Error}}<span class="bad">{{.Error}}</span>{{else if .Checked}}checked {{.Checked}}{{else}}not checked yet{{end}}</td></tr>
-{{else}}<tr><td class="bad">No app set: give Relay RADARR_URL and RADARR_API_KEY (or Sonarr's, Lidarr's).</td></tr>{{end}}</table>
-<h2>Paired</h2><table>{{range .Clients}}<tr><td>{{.Name}}</td><td class="dim">since {{.PairedAt.Format "2 Jan 2006"}}</td></tr>
-{{else}}<tr><td class="dim">No Q8 yet.</td></tr>{{end}}</table>
-<p class="dim">{{.Latest}} files announced.</p>
-</body></html>`))
-
-func (s *Server) page(w http.ResponseWriter, r *http.Request) {
-	type app struct{ Name, Checked, Error string }
-	data := struct {
-		Name, Version, ID, Code string
-		Protocol                int
-		ShowCode                bool
-		Apps                    []app
-		Clients                 []pairing.Client
-		Latest                  int64
-	}{Name: s.Name, Version: s.Version, ID: s.Pairing.RelayID(), Protocol: Protocol, ShowCode: s.ShowCode,
-		Clients: s.Pairing.Clients(), Latest: s.Hub.Latest()}
-	if s.ShowCode {
-		data.Code, _ = s.Pairing.Code()
+	if s.Stats == nil {
+		http.ServeContent(w, r, filepath.Base(a.Path), info.ModTime(), f)
+		return
 	}
-	for _, wt := range s.Watchers {
-		checked, problem := wt.Status()
-		a := app{Name: wt.Client.App, Error: problem}
-		if !checked.IsZero() {
-			a.Checked = time.Since(checked).Round(time.Second).String() + " ago"
-		}
-		data.Apps = append(data.Apps, a)
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	_ = pageTemplate.Execute(w, data)
+	// Counted for the page: what's sent, and whether this request finished
+	// the file — a resumed download finishes it from where it started.
+	sent, done := s.Stats.Started(client(r).Name, a.ID, a.FileName, info.Size(), a.ImportedAt)
+	cw := &countingWriter{ResponseWriter: w, sent: sent}
+	http.ServeContent(cw, r, filepath.Base(a.Path), info.ModTime(), f)
+	from := rangeStart(r.Header.Get("Range"))
+	done(r.Method == http.MethodGet && cw.status < 300 && from+cw.total >= info.Size())
 }
 
 func (s *Server) focusedReport(w http.ResponseWriter, r *http.Request) {
@@ -318,6 +298,37 @@ func (s *Server) confirm(w http.ResponseWriter, r *http.Request) {
 		s.Log.Warn("couldn't save Q8 focused's state", "err", err)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"outcomes": outcomes})
+}
+
+// countingWriter counts the body bytes a response sends.
+type countingWriter struct {
+	http.ResponseWriter
+	sent   func(int64)
+	total  int64
+	status int
+}
+
+func (c *countingWriter) WriteHeader(status int) {
+	c.status = status
+	c.ResponseWriter.WriteHeader(status)
+}
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	n, err := c.ResponseWriter.Write(p)
+	c.total += int64(n)
+	c.sent(int64(n))
+	return n, err
+}
+
+// rangeStart is where "bytes=N-" asks a download to start, 0 without one.
+func rangeStart(header string) int64 {
+	spec, ok := strings.CutPrefix(header, "bytes=")
+	if !ok {
+		return 0
+	}
+	from, _, _ := strings.Cut(spec, "-")
+	n, _ := strconv.ParseInt(strings.TrimSpace(from), 10, 64)
+	return n
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

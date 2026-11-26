@@ -43,6 +43,10 @@ type state struct {
 	Enabled bool           `json:"enabled"`
 	Tags    map[string]int `json:"tags"`
 	Done    []string       `json:"done"`
+	// Cleared counts the arr copies deleted once Q8 had them, and Freed
+	// their size, for Relay's page.
+	Cleared int   `json:"cleared,omitempty"`
+	Freed   int64 `json:"freed,omitempty"`
 }
 
 // Focused holds Q8 focused's state.
@@ -158,6 +162,14 @@ func (f *Focused) Disable(ctx context.Context) (Report, error) {
 	return r, err
 }
 
+// Totals are the arr copies deleted since Q8 focused was first on, and
+// the space that freed.
+func (f *Focused) Totals() (int, int64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.state.Cleared, f.state.Freed
+}
+
 // Confirm is Q8 saying it has these arrivals, converted and checked: each
 // is unmonitored and its arr's file deleted. Asking twice is fine.
 func (f *Focused) Confirm(ctx context.Context, ids []string) ([]Outcome, error) {
@@ -205,6 +217,8 @@ func (f *Focused) confirm(ctx context.Context, id string) error {
 	}
 	f.log.Info("deleted the arr's copy: Q8 has it", "app", a.App, "file", a.FileName)
 	f.state.Done = append(f.state.Done, id)
+	f.state.Cleared++
+	f.state.Freed += a.Size
 	if over := len(f.state.Done) - hub.Keep; over > 0 {
 		f.state.Done = append([]string(nil), f.state.Done[over:]...)
 	}

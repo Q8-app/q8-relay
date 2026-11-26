@@ -198,3 +198,38 @@ func TestLidarrTrackFoundThroughItsTrackWithTheAlbumArtist(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
+
+func TestHealthReadsWarningsDisksAndUpgrades(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v3/system/status":
+			w.Write([]byte(`{"appName":"Radarr","version":"5.9"}`))
+		case "/api/v3/health":
+			w.Write([]byte(`[{"type":"warning","message":"Indexer down"},{"type":"error","message":"No download client"},{"type":"notice","message":"Update"}]`))
+		case "/api/v3/config/mediamanagement":
+			w.Write([]byte(`{"minimumFreeSpaceWhenImporting":100,"recycleBin":"/data/.bin","downloadPropersAndRepacks":"doNotUpgrade"}`))
+		case "/api/v3/diskspace":
+			w.Write([]byte(`[{"path":"/","label":"","freeSpace":5000000000,"totalSpace":10000000000},{"path":"/data","label":"Media","freeSpace":50000000000,"totalSpace":1000000000000}]`))
+		case "/api/v3/rootfolder":
+			w.Write([]byte(`[{"path":"/data/movies"}]`))
+		case "/api/v3/qualityprofile":
+			w.Write([]byte(`[{"name":"HD-1080p","upgradeAllowed":true},{"name":"Any","upgradeAllowed":false}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	h := (&Client{App: "radarr", BaseURL: srv.URL, APIKey: "k"}).Health(context.Background())
+	if h.Version != "5.9" || h.Unreachable != "" {
+		t.Fatalf("health %+v", h)
+	}
+	if len(h.Problems) != 3 || !h.Problems[0].Fault || h.Problems[0].Text != "No download client" {
+		t.Fatalf("problems %+v", h.Problems)
+	}
+	if len(h.Disks) != 1 || h.Disks[0].Name != "Media" {
+		t.Fatalf("disks %+v", h.Disks)
+	}
+	if !h.Upgrades.On() || len(h.Upgrades.Profiles) != 1 || h.Upgrades.Repacks || h.RecycleBin != "/data/.bin" {
+		t.Fatalf("upgrades %+v, bin %q", h.Upgrades, h.RecycleBin)
+	}
+}

@@ -122,6 +122,24 @@ The arrs' API keys stay in Relay. Q8 holds only its own pairing key, kept in
 the Mac's Keychain. Relay stores just a hash of that key. Q8 always connects
 out to Relay, so the Mac needs no open port.
 
+### Relay's page
+
+`http://<server>:8484` shows what Relay is doing, refreshed every 10 seconds:
+
+- its mode, version and how long it has been running
+- each arr: its version, its own health warnings, how full its library disk
+  is, and whether its upgrades are on
+- the paired Macs: connected now or when last seen, and what each is
+  downloading
+- numbers: files announced today, this week and in total, data sent to Q8,
+  and how long a file typically takes from import to Q8 (with Q8 focused,
+  copies cleared and space freed)
+- the last 10 files, and which Mac fetched each
+- what's worth doing, such as turning off upgrades
+
+The page only reads. Relay asks the arrs with GET requests, as it does for
+imports, and changes nothing from the page.
+
 ### Q8 focused (optional, switched on from Q8)
 
 Read this before turning it on. Once Q8 has converted a file and checked it

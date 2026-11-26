@@ -96,8 +96,17 @@ func run(log *slog.Logger) error {
 	if focus.Enabled() {
 		log.Info("Q8 focused is on: once Q8 confirms a file, the arr's copy is deleted into its Recycle Bin")
 	}
+	stats, err := server.OpenStats(cfg.DataDir)
+	if err != nil {
+		log.Warn(err.Error())
+	}
+	board := arr.NewBoard()
+	go board.Run(ctx, clients, 5*time.Minute)
 	srv := &server.Server{Name: cfg.Name, Version: version, ShowCode: cfg.ShowCode, Hub: h, Pairing: pair,
-		Watchers: watchers, Focused: focus, Log: log}
+		Watchers: watchers, Focused: focus, Log: log, Health: board, Stats: stats, Started: time.Now()}
+	if !cfg.Announce {
+		srv.Bonjour = "Bonjour is switched off (RELAY_ANNOUNCE=false)"
+	}
 	httpServer := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           srv.Handler(),
@@ -107,6 +116,7 @@ func run(log *slog.Logger) error {
 		stop, err := announce.Start(cfg.Name, pair.RelayID(), cfg.Port, server.Protocol)
 		if err != nil {
 			log.Warn("Bonjour announcing failed — Q8 can still connect by address", "err", err)
+			srv.Bonjour = "Bonjour couldn't start"
 		}
 		defer stop()
 	}
