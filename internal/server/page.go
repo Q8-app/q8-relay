@@ -70,7 +70,7 @@ type pageRecommendation struct {
 
 func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
-	d := pageData{Name: s.Name, Version: s.Version, ID: s.Pairing.RelayID(), Protocol: Protocol,
+	d := pageData{Name: s.Name, Version: shortVersion(s.Version), ID: s.Pairing.RelayID(), Protocol: Protocol,
 		ShowCode: s.ShowCode, Mode: "Connect what you have"}
 	if !s.Started.IsZero() {
 		d.Uptime = "up " + ago(now.Sub(s.Started))
@@ -200,6 +200,15 @@ func (s *Server) pageApp(wt *arr.Watcher, all []hub.Arrival, now time.Time, d *p
 		}
 	}
 	return a
+}
+
+// shortVersion is a commit's first seven characters, as GitHub shows it:
+// each push to main is built with its commit as the version.
+func shortVersion(v string) string {
+	if len(v) == 40 && strings.Trim(v, "0123456789abcdef") == "" {
+		return v[:7]
+	}
+	return v
 }
 
 func upgradeSteps(u arr.Upgrades) []string {

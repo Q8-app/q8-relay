@@ -1,10 +1,10 @@
-# A version tag (v0.1.0) builds Relay for amd64 and arm64 and publishes it
-# to ghcr.io/q8-app/q8-relay as 0.1.0, 0.1 and latest.
+# Every push to main builds Relay for amd64 and arm64 and publishes it to
+# ghcr.io/q8-app/q8-relay as latest (pre-production: no version tags yet).
 name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
 
 permissions:
   contents: read
@@ -31,8 +31,6 @@ jobs:
         with:
           images: ghcr.io/q8-app/q8-relay
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
           labels: |
             org.opencontainers.image.title=Q8 Relay
@@ -45,6 +43,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: VERSION=${{ steps.meta.outputs.version }}
+          build-args: VERSION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
