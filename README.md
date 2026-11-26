@@ -109,6 +109,15 @@ Relay starts in **Connect what you have** mode:
 On its first run Relay ignores everything already imported. What your arrs
 had before is your library, not news, so only new imports are announced.
 
+**Turn off upgrades in your arrs.** Q8 converts each file once. Turn off
+upgrades in your arrs so they don't download and add a second copy:
+
+- Settings › Profiles: untick **Upgrades Allowed** in each quality profile.
+- Settings › Media Management › Propers and Repacks: **Do Not Upgrade
+  Automatically**.
+
+Q8 shows a line under an arr on its Media Server screen while upgrades are on.
+
 The arrs' API keys stay in Relay. Q8 holds only its own pairing key, kept in
 the Mac's Keychain. Relay stores just a hash of that key. Q8 always connects
 out to Relay, so the Mac needs no open port.
