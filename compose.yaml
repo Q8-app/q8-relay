@@ -4,7 +4,7 @@
 # imported files where the arrs put them.
 services:
   q8-relay:
-    image: ghcr.io/q8-app/q8-relay:0.1
+    image: ghcr.io/q8-app/q8-relay:0.2
     container_name: q8-relay
     # The same user as your arrs (their PUID:PGID), so Relay can read
     # their files and write its own /config.

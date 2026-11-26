@@ -24,7 +24,7 @@ Add Relay to the compose file that runs your arrs:
 
 ```yaml
   q8-relay:
-    image: ghcr.io/q8-app/q8-relay:0.1
+    image: ghcr.io/q8-app/q8-relay:0.2
     container_name: q8-relay
     user: "1000:1000"            # your arrs' PUID:PGID
     environment:
@@ -67,7 +67,7 @@ so point it at the ports they publish on the host:
 
 ```yaml
   q8-relay:
-    image: ghcr.io/q8-app/q8-relay:0.1
+    image: ghcr.io/q8-app/q8-relay:0.2
     container_name: q8-relay
     user: "1000:1000"            # your arrs' PUID:PGID
     network_mode: host           # replaces ports:
